@@ -7,7 +7,7 @@ import java.util.Properties;
 
 public class GrailsSwitcher {
 	private static String version = "0.1.2"
-	
+
 	// hidden folder that get's placed in user home
 	private static String GSWITCH_PATH = "/.gswitch"
 	//url pattern for downloading Grails versions. This may change in the future, but mirrors will be saved in this array
@@ -16,12 +16,18 @@ public class GrailsSwitcher {
 		"http://grails.org/dist/"
 	]
 
+	private String uname = ""
 	private String userHome = ""
 	private CliBuilder cli
 
 	def GrailsSwitcher(){
+		uname = "uname".execute().text.trim()
+		if(uname.startsWith("CYGWIN"))
+			userHome = System.getenv("HOME")
+		else
+			userHome = System.getProperty("user.home")
+
 		//construct the CLI options
-		userHome = System.getProperty("user.home")
 		cli = new CliBuilder(usage:"gswitch [options] <version>")
 		cli.h(longOpt:"help", "Display this message")
 		cli.v(longOpt:"versions", "Lists currently installed Grails versions")
@@ -35,7 +41,7 @@ public class GrailsSwitcher {
 		Convenience method for building the path to the symlink. This path should be set to your $GRAILS_HOME, and $GRAILS_HOME/bin should be in your path
 	*/
 	String symPath(){
-		userHome+GSWITCH_PATH+"/grails"
+		def r = userHome+GSWITCH_PATH+"/grails"
 	}
 
 	/**
@@ -75,7 +81,7 @@ public class GrailsSwitcher {
 	}
 
 	/**
-		Checks to see if the user is currently in a Grails Application. It does this by looking for 'application.properties' and a 
+		Checks to see if the user is currently in a Grails Application. It does this by looking for 'application.properties' and a
 		'grails-app' directory
 	**/
 	def isGrailsApplication(){
@@ -107,15 +113,15 @@ public class GrailsSwitcher {
 
 	/**
 		Cycles through the MIRRORS, looking for the grails version
-	
+
 
 	**/
 	def downloadVersion( targetVersion, zipPath ){
 		boolean result = false
 		FileOutputStream zipFile
 		BufferedOutputStream out
-		
-		for(mirror in MIRRORS){	
+
+		for(mirror in MIRRORS){
 			try{
 				//attempt to download a new version
 				println "Downloading from ${mirror}..."
@@ -149,24 +155,24 @@ public class GrailsSwitcher {
 	**/
 	def installVersion( targetVersion ){
 		println "Installing ${targetVersion}"
-		
+
 		String versionPath = versionFolderPath( targetVersion )
 		String zipPath = versionPath+".zip"
-		
+
 		if(downloadVersion(targetVersion, zipPath)){
 
 	    	//unzip
 	    	if(new File(zipPath).exists()){
 	    		def ant = new AntBuilder()
 	    		try{
-	    			ant.unzip( src: zipPath, dest: versionsPath(), overWrite:true)	
+	    			ant.unzip( src: zipPath, dest: versionsPath(), overWrite:true)
 	    		}
 	    		catch(java.util.zip.ZipException ze){
 	    			println "There was a problem unzipping the file. Clearing out. Please try again, and if problem persists, please report it"
 	    			zipPath.delete()
 	    		}
 	    	}
-	    	
+
 	    	//check complete
 	    	if(new File(versionPath).exists()){
 	    		//set executable permissions on the bin folder, just in case
@@ -188,33 +194,33 @@ public class GrailsSwitcher {
 		new File(versionsPath()).eachDir {
 			versions.add(it.absolutePath.split("-")[-1])
 		}
-		versions		
+		versions
 	}
 
 
 	def listInstalledVersions(){
 		println "Installed Grails Versions:"
 		getInstalledVersions().each{
-			println "\t${it}"	
-		}	
+			println "\t${it}"
+		}
 	}
 
 	def replaceSymLink( String path ){
 		//first, remove the old link, if exists
-		
+
 		try{
 			File link = new File( symPath() )
 			if(link.exists()){
-				link.delete()	
+				link.delete()
 			}
 		}
 		catch(Exception e){
 			println "error!"
 		}
-		
+
 		// now, create
 		if(new File(path).exists()){
-			['ln', '-s', path, symPath()].execute().waitFor() 
+			['ln', '-s', path, symPath()].execute().waitFor()
 		}
 		else{
 			println "Error: Could not create a symlink."
@@ -237,7 +243,7 @@ public class GrailsSwitcher {
 	}
 
 	/**
-		Prompts the user if they wish to install a Grails version. 
+		Prompts the user if they wish to install a Grails version.
 
 		@param String targetVersion The version to install
 	**/
@@ -247,7 +253,7 @@ public class GrailsSwitcher {
 		String yOrN = "[y/n]: "
 		print "Would you like to install version '${targetVersion}'? ${yOrN}"
 		System.in.withReader {
-			while(true){ 
+			while(true){
 				input = it.readLine().toLowerCase()
 				if(input=="y"){
 					allowed = true
@@ -261,11 +267,11 @@ public class GrailsSwitcher {
 					print yOrN
 				}
 			}
-			
+
 		}
 		if(allowed){
 			installVersion targetVersion
-		} 
+		}
 	}
 
 
@@ -283,7 +289,7 @@ public class GrailsSwitcher {
 			else{
 				println "No version found"
 			}
-			
+
 		}
 		else{
 			println "This command must be executed while in the root folder of a Grails Application"
@@ -294,23 +300,23 @@ public class GrailsSwitcher {
 	def go(args){
 		//def cli = new CliBuilder(usage:"gswitch [version]"),
 		def	targetVersion = "",
-			options = cli.parse(args)		
+			options = cli.parse(args)
 
 		if( isFirstRun() ){
 			println "Configuring folders..."
 			init()
 		}
-		
+
 		if(!options.arguments() && isGrailsApplication() && !options.h){
 			matchVersion()
 		}
-		
+
 		else if( options.init){
 			init()
 		}
 		else if(options.a){
 			matchVersion()
-		}		
+		}
 		else if(options.i){
 			installVersion( options.i )
 		}
